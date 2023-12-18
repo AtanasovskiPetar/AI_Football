@@ -8,8 +8,7 @@ pygame.display.set_mode((1366, 768), pygame.RESIZABLE)
 
 env = gym.make("AiFootball", render_mode='human')
 env.reset()
-model = DDPG.load("models/ai_football_3/850000.zip", env=env)
-
+model = DDPG.load("models/ai_football_3/900000.zip", env=env)
 
 env = model.get_env()
 obs = env.reset()
@@ -18,4 +17,3 @@ while True:
     obs, rewards, dones, info = env.step(action)
     print(f'Action: {action}')
     env.render()
-
