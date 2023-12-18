@@ -1,5 +1,6 @@
 __credits__ = ["Petar Atanasovski"]
 
+import math
 from os import path
 from typing import Optional
 import gymnasium as gym
@@ -296,7 +297,6 @@ def team_properties():
 
 team_1_properties = team_properties()
 team_2_properties = team_properties()
-print(team_1_properties['player_names'][1])
 team_1 = [Player(team_1_properties['player_names'][0], weights[0], radiuses[0], accelerations[0], speeds[0],
                  shot_powers[0]),
           Player(team_1_properties['player_names'][1], weights[1], radiuses[1], accelerations[1], speeds[1],
@@ -605,7 +605,6 @@ def decision(our_team, their_team, ball, your_side, half, time_left, our_score, 
                 1]
         manager_decision[i]['shot_power'] = shot_power  # use different shot power: (0, 'shot_power_max')
         i += 1
-    # print(our_score, their_score)
     return manager_decision
 
 
@@ -643,24 +642,24 @@ class AiFootballEnv(gym.Env):
         self.render_mode = render_mode
 
         # Define your action space
-        self.action_space = spaces.Box(
-            # 'shot_request_1', 'force_1', 'shot_power_1', 'alpha_1',
-            # 'shot_request_2', 'force_2', 'shot_power_2', 'alpha_2',
-            # 'shot_request_3', ,'force_3', 'shot_power_3' 'alpha_3'
-            low=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-            high=np.array(
-                [1, 160600, 13000, 2 * np.pi, 1, 160600, 14000, 2 * np.pi, 1, 160600, 10000, 2 * np.pi])
-        )
+        normalized_low = -1.0
+        normalized_high = 1.0
+        # 'shot_request_1', 'force_1', 'shot_power_1', 'alpha_1',
+        # 'shot_request_2', 'force_2', 'shot_power_2', 'alpha_2',
+        # 'shot_request_3', ,'force_3', 'shot_power_3' 'alpha_3'
+        self.original_action_low = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+        self.original_action_high = np.array([1, 160600, 13000, 2 * np.pi, 1, 160600, 14000,
+                                              2 * np.pi, 1, 160600, 10000, 2 * np.pi])
+        self.action_space = spaces.Box(low=normalized_low, high=normalized_high, shape=(12,), dtype=np.float32)
+
         # Define your state space
+        self.original_players_low = np.array([50, 203, 0, 0] * 6)
+        self.original_players_high = np.array([1316, 718, 2 * np.pi, 700] * 6)
+        self.original_ball_low = np.array([50, 203, 0, 0])
+        self.original_ball_high = np.array([1316, 718, 2 * np.pi, 850])
         self.observation_space = spaces.Dict({
-            'players': spaces.Box(
-                low=np.array([50, 203, 0, 0] * 6),  # x, y, alpha, velocity for each player
-                high=np.array([1316, 718, 2 * np.pi, 700] * 6)  # x, y, alpha, velocity for each player
-            ),
-            'ball': spaces.Box(
-                low=np.array([50, 203, 0, 0]),  # x, y, alpha, velocity for the ball
-                high=np.array([1316, 718, 2 * np.pi, 850])  # x, y, alpha, velocity for the ball
-            ),
+            'players': spaces.Box(low=normalized_low, high=normalized_high, shape=(24,), dtype=np.float32),
+            'ball': spaces.Box(low=normalized_low, high=normalized_high, shape=(4,), dtype=np.float32),
             'time_left': spaces.Discrete(46),
             'our_score': spaces.Discrete(100),
             'their_score': spaces.Discrete(100)
@@ -674,8 +673,6 @@ class AiFootballEnv(gym.Env):
         self.iteration = 1600
         self.done = False
         self.screen = None
-        self.screen = None
-        self.start = time.time()
         self.team_1 = [
             Player(team_1_properties['player_names'][0], weights[0], radiuses[0], accelerations[0], speeds[0],
                    shot_powers[0]),
@@ -717,10 +714,16 @@ class AiFootballEnv(gym.Env):
             player_info.append(np.mod(player.alpha, 2 * np.pi))
             player_info.append(player.v)
 
+        p = np.array(player_info, dtype=np.float32)
+        b = np.array([self.ball.x, self.ball.y, np.mod(self.ball.alpha, 2 * np.pi), self.ball.v],
+                     dtype=np.float32)
+        normalized_players = 2 * ((p - self.original_players_low) /
+                                  (self.original_players_high - self.original_players_low)) - 1
+        normalized_ball = 2 * ((b - self.original_ball_low) / (self.original_ball_high - self.original_ball_low)) - 1
+
         self.observation = {
-            'players': np.array(player_info, dtype=np.float32),
-            'ball': np.array([self.ball.x, self.ball.y, np.mod(self.ball.alpha, 2 * np.pi), self.ball.v],
-                             dtype=np.float32),
+            'players': normalized_players.astype(np.float32),
+            'ball': normalized_ball.astype(np.float32),
             'time_left': self.time_to_play,
             'our_score': self.team_1_score,
             'their_score': self.team_2_score
@@ -728,6 +731,8 @@ class AiFootballEnv(gym.Env):
         return self.observation, {}
 
     def step(self, action):
+
+        action = ((action + 1) / 2) * (self.original_action_high - self.original_action_low) + self.original_action_low
 
         self.iteration -= 1
         if self.iteration <= 0:
@@ -756,6 +761,7 @@ class AiFootballEnv(gym.Env):
             time_left=self.time_to_play,
             our_score=self.team_2_score,
             their_score=self.team_1_score)
+
         manager_decision = [manager_1_decision[0], manager_1_decision[1], manager_1_decision[2],
                             manager_2_decision[0], manager_2_decision[1], manager_2_decision[2]]
 
@@ -764,9 +770,10 @@ class AiFootballEnv(gym.Env):
         manager_decision[0]['alpha'] += self.angle_change
         manager_decision[0]['force'] += self.velocity_change
 
-        for i, player in enumerate(self.circles[:6]):
+        for i, player in enumerate(self.team_1 + self.team_2):
             player.move(manager_decision[i])
         self.ball.move()
+
         goal = False
         if not goal:
             goal_team_right = post_screen_top < self.ball.y < post_screen_bottom and self.ball.x < post_screen_left
@@ -799,10 +806,16 @@ class AiFootballEnv(gym.Env):
             player_info.append(np.mod(player.alpha, 2 * np.pi))
             player_info.append(player.v)
 
+        p = np.array(player_info, dtype=np.float32)
+        b = np.array([self.ball.x, self.ball.y, np.mod(self.ball.alpha, 2 * np.pi), self.ball.v],
+                     dtype=np.float32)
+        normalized_players = 2 * ((p - self.original_players_low) /
+                                  (self.original_players_high - self.original_players_low)) - 1
+        normalized_ball = 2 * ((b - self.original_ball_low) / (self.original_ball_high - self.original_ball_low)) - 1
+
         self.observation = {
-            'players': np.array(player_info, dtype=np.float32),
-            'ball': np.array([self.ball.x, self.ball.y, np.mod(self.ball.alpha, 2 * np.pi), self.ball.v],
-                             dtype=np.float32),
+            'players': normalized_players.astype(np.float32),
+            'ball': normalized_ball.astype(np.float32),
             'time_left': self.time_to_play,
             'our_score': self.team_1_score,
             'their_score': self.team_2_score
@@ -825,9 +838,31 @@ class AiFootballEnv(gym.Env):
         #     player_reward = max(0, 1.0 - distance_to_ball / max_distance)
         #     total_reward += player_reward
         # return total_reward
-        if self.team_1_score == self.team_2_score:
-            return -1
-        return (self.team_1_score - self.team_2_score) * 10
+        score = 0
+        if self.team_1_score - self.team_2_score > 10:
+            score = 1
+        elif self.team_2_score - self.team_1_score > 10:
+            score = -1
+        if self.team_1_score != self.team_2_score:
+            r = self.team_1_score - self.team_2_score
+            score = 2 * ((r - (-10)) / (10 - (-10))) - 1
+        if self.ball.x > 900:
+            score = 0.05
+        elif self.ball.x > 750:
+            score = 0.025
+        elif self.ball.x < 500:
+            score = -0.05
+
+        for my_player in self.team_1:
+            for their_player in self.team_2:
+                x1, y1 = my_player.x, my_player.y
+                x2, y2 = their_player.x, their_player.y
+                distance = math.dist([x1, y1], [x2, y2])
+                if distance < 50:
+                    score -= 0.015
+            if my_player.v == 0:
+                score -= 0.015
+        return score
 
     def render(self):
         if self.render_mode is None:
