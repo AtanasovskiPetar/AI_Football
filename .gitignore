@@ -9,3 +9,4 @@ AI_Football/AIFootball/models/DDPG/*
 AI_Football/AIFootball/models/PPO/*
 AI_Football/AIFootball/logs/DDPG_logs/*
 AI_Football/AIFootball/logs/PPO_logs/*
+.idea
