@@ -16,3 +16,9 @@ register(
     entry_point="gym_envs.envs:AiFootballEnv",
     max_episode_steps=1700,
 )
+
+register(
+    id="CartpoleCustom-v0",
+    entry_point="gym_envs.envs:CartPoleEnv",
+    max_episode_steps=1700,
+)

@@ -6,4 +6,5 @@ import gym_envs.envs.ai_football
 env1 = gym.make("gym_envs/GridWorld-v0")
 env2 = gym.make("gym_envs/Pendulum-v0")
 env2 = gym.make("AiFootball-v0")
+env2 = gym.make("CartpoleCustom-v0")
 print('Success')

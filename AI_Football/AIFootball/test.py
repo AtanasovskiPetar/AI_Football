@@ -8,7 +8,7 @@ pygame.display.set_mode((1366, 768), pygame.RESIZABLE)
 
 env = gym.make("AiFootball-v0", render_mode='human')
 env.reset()
-model = PPO.load("models/PPO/ai_football_1/4000k", env=env)
+model = PPO.load("models/PPO/ai_football_2/11000000.zip", env=env)
 
 env = model.get_env()
 obs = env.reset()
